@@ -1,6 +1,8 @@
 import asyncio
 import json
+import logging
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
@@ -9,6 +11,9 @@ from fastapi.templating import Jinja2Templates
 from paho.mqtt import client as mqtt_client
 
 from config import Config
+from tsdb import PositionPoint, TimeSeriesDB, create_tsdb_from_env
+
+logger = logging.getLogger(__name__)
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
 
@@ -23,6 +28,7 @@ last_positions: dict[str, dict] = {}
 mqtt: mqtt_client.Client | None = None
 mqtt_loop: asyncio.AbstractEventLoop | None = None
 broadcaster_task: asyncio.Task | None = None
+tsdb: TimeSeriesDB | None = None
 
 
 def on_mqtt_connect(client: mqtt_client.Client, userdata, flags, rc, properties):
@@ -55,6 +61,7 @@ def on_mqtt_message(client: mqtt_client.Client, userdata, msg):
         "device_name": device.name,
         "x": x,
         "y": y,
+        "timestamp": datetime.now(timezone.utc),
     }
 
     if mqtt_loop is not None:
@@ -67,21 +74,37 @@ async def broadcast_positions():
         last_positions[data["device_id"]] = data
         dead_clients = []
 
+        ws_data = {k: v for k, v in data.items() if k != "timestamp"}
         for ws in list(ws_clients):
             try:
-                await ws.send_json(data)
+                await ws.send_json(ws_data)
             except Exception:
                 dead_clients.append(ws)
 
         for ws in dead_clients:
             ws_clients.discard(ws)
 
+        if tsdb is not None:
+            try:
+                point = PositionPoint(
+                    device_id=data["device_id"],
+                    device_name=data["device_name"],
+                    x=float(data["x"]),
+                    y=float(data["y"]),
+                    timestamp=data["timestamp"],
+                )
+                await tsdb.write_position(point)
+            except Exception:
+                logger.warning("Failed to write position to TSDB", exc_info=True)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    global mqtt, mqtt_loop, broadcaster_task
+    global mqtt, mqtt_loop, broadcaster_task, tsdb
 
     mqtt_loop = asyncio.get_running_loop()
+
+    tsdb = create_tsdb_from_env()
 
     mqtt = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2)
     mqtt.username_pw_set(config.mqtt.username, config.mqtt.password)
@@ -105,6 +128,9 @@ async def lifespan(app: FastAPI):
     if mqtt:
         mqtt.loop_stop()
         mqtt.disconnect()
+
+    if tsdb is not None:
+        await tsdb.aclose()
 
 
 app = FastAPI(title="Cat GPS", lifespan=lifespan)

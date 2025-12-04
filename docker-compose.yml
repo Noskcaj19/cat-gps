@@ -1,0 +1,35 @@
+services:
+  influxdb:
+    image: influxdb:3-core
+    container_name: influxdb
+    user: root
+    #ports:
+    #  - "8181:8181"
+    command:
+      - influxdb3
+      - serve
+      - --node-id=node0
+      - --object-store=file
+      - --data-dir=/var/lib/influxdb3/data
+      - --without-auth
+    volumes:
+      - influxdb-data:/var/lib/influxdb3/data
+
+  cat-gps:
+    build:
+      context: .
+      dockerfile: Containerfile
+    depends_on:
+      - influxdb
+    environment:
+      TSDB_TYPE: influx
+      TSDB_HOST: influxdb
+      TSDB_PORT: "8181"
+      TSDB_DATABASE: cat-positions
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config.yml:/app/config.yml:ro
+
+volumes:
+  influxdb-data:
