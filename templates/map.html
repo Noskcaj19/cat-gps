@@ -67,8 +67,12 @@
                 {% for room in rooms %}
                 <g class="room" data-room-id="{{ room.name }}">
                     <polygon points="{% for point in room.svg_points %}{{ point[0] }},{{ point[1] }}{% if not loop.last %} {% endif %}{% endfor %}" style="fill: hsl({{ loop.index0 * 25 }}, 50%, 30%);" />
-                    <text class="room__label" x="{{ room.label_x }}" y="{{ room.label_y }}">{{ room.name }}</text>
                 </g>
+                {% endfor %}
+            </g>
+            <g id="room-labels">
+                {% for room in rooms %}
+                <text class="room__label" x="{{ room.label_x }}" y="{{ room.label_y }}">{{ room.name }}</text>
                 {% endfor %}
             </g>
             <g id="nodes">
