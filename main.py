@@ -128,17 +128,12 @@ async def ws_positions(ws: WebSocket):
         ws_clients.discard(ws)
 
 
-@app.get("/", response_class=HTMLResponse)
-async def root():
-    return "<h1>Cat GPS</h1><p>Cat location tracker</p>"
-
-
 @app.get("/health")
 async def health():
     return {"status": "ok"}
 
 
-@app.get("/map", response_class=HTMLResponse)
+@app.get("/", response_class=HTMLResponse)
 async def map_page(request: Request):
     bounds = config.floors[0].bounds
     min_x, min_y = bounds[0].x, bounds[0].y
