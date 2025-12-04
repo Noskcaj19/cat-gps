@@ -170,7 +170,8 @@
             cat.element.setAttribute('transform', `translate(${sx}, ${sy})`);
         }
 
-        const ws = new WebSocket(`ws://${location.host}/ws/positions`);
+        const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${wsProtocol}//${location.host}/ws/positions`);
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (!cats[data.device_id]) {
