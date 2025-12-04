@@ -18,6 +18,7 @@ device_by_id = {d.id: d for d in config.devices}
 
 position_queue: asyncio.Queue[dict] = asyncio.Queue()
 ws_clients: set[WebSocket] = set()
+last_positions: dict[str, dict] = {}
 
 mqtt: mqtt_client.Client | None = None
 mqtt_loop: asyncio.AbstractEventLoop | None = None
@@ -63,6 +64,7 @@ def on_mqtt_message(client: mqtt_client.Client, userdata, msg):
 async def broadcast_positions():
     while True:
         data = await position_queue.get()
+        last_positions[data["device_id"]] = data
         dead_clients = []
 
         for ws in list(ws_clients):
@@ -111,6 +113,8 @@ app = FastAPI(title="Cat GPS", lifespan=lifespan)
 @app.websocket("/ws/positions")
 async def ws_positions(ws: WebSocket):
     await ws.accept()
+    for pos in last_positions.values():
+        await ws.send_json(pos)
     ws_clients.add(ws)
     try:
         while True:
