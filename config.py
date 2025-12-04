@@ -37,6 +37,13 @@ class Device:
 
 
 @dataclass
+class Node:
+    name: str
+    point: Point3D
+    floors: list[str]
+
+
+@dataclass
 class MQTTConfig:
     host: str
     port: int
@@ -49,6 +56,7 @@ class Config:
     mqtt: MQTTConfig
     devices: list[Device]
     floors: list[Floor]
+    nodes: list[Node]
 
     @classmethod
     def load(cls, path: Path | None = None) -> "Config":
@@ -63,7 +71,8 @@ class Config:
         mqtt = cls._parse_mqtt(data.get("mqtt_server", {}))
         devices = cls._parse_devices(data.get("devices", []))
         floors = cls._parse_floors(data.get("floors", []))
-        return cls(mqtt=mqtt, devices=devices, floors=floors)
+        nodes = cls._parse_nodes(data.get("nodes", []))
+        return cls(mqtt=mqtt, devices=devices, floors=floors, nodes=nodes)
 
     @staticmethod
     def _parse_mqtt(data: dict) -> MQTTConfig:
@@ -99,3 +108,14 @@ class Config:
                 )
             )
         return floors
+
+    @staticmethod
+    def _parse_nodes(nodes_data: list[dict]) -> list[Node]:
+        return [
+            Node(
+                name=n["name"],
+                point=Point3D(*n["point"]),
+                floors=n.get("floors", []),
+            )
+            for n in nodes_data
+        ]

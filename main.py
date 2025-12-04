@@ -167,11 +167,17 @@ async def map_page(request: Request):
                 "label_y": cy,
             })
 
+    nodes = []
+    for node in config.nodes:
+        sx, sy = to_svg(node.point.x, node.point.y)
+        nodes.append({"x": sx, "y": sy})
+
     return templates.TemplateResponse(
         request,
         "map.html",
         {
             "rooms": rooms,
+            "nodes": nodes,
             "min_x": min_x,
             "min_y": min_y,
             "max_x": max_x,
