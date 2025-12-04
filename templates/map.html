@@ -27,7 +27,7 @@
 
         function toCanvas(x, y) {
             const sx = (x - bounds.minX) * baseScale * zoom + panX;
-            const sy = (y - bounds.minY) * baseScale * zoom + panY;
+            const sy = canvas.height - (y - bounds.minY) * baseScale * zoom + panY;
             return [sx, sy];
         }
 
