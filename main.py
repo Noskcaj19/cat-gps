@@ -216,7 +216,7 @@ async def map_page():
 
                 panX = mx - (mx - panX) * (zoom / oldZoom);
                 panY = my - (my - panY) * (zoom / oldZoom);
-                draw();
+                drawAll();
             }});
 
             canvas.addEventListener('mousedown', (e) => {{
@@ -232,7 +232,7 @@ async def map_page():
                 panY += e.clientY - lastY;
                 lastX = e.clientX;
                 lastY = e.clientY;
-                draw();
+                drawAll();
             }});
 
             canvas.addEventListener('mouseup', () => {{
@@ -245,8 +245,48 @@ async def map_page():
                 canvas.style.cursor = 'grab';
             }});
 
+            const cats = {{}};
+
+            function drawCats() {{
+                Object.values(cats).forEach(cat => {{
+                    const [cx, cy] = toCanvas(cat.x, cat.y);
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 8 * zoom, 0, Math.PI * 2);
+                    ctx.fillStyle = cat.color;
+                    ctx.fill();
+                    ctx.strokeStyle = '#fff';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#fff';
+                    ctx.font = 'bold 12px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(cat.name, cx, cy - 14 * zoom);
+                }});
+            }}
+
+            function drawAll() {{
+                draw();
+                drawCats();
+            }}
+
+            const catColors = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3'];
+            let colorIndex = 0;
+
+            const ws = new WebSocket(`ws://${{location.host}}/ws/positions`);
+            ws.onmessage = (e) => {{
+                const data = JSON.parse(e.data);
+                if (!cats[data.device_id]) {{
+                    cats[data.device_id] = {{ color: catColors[colorIndex++ % catColors.length] }};
+                }}
+                cats[data.device_id].name = data.device_name;
+                cats[data.device_id].x = data.x;
+                cats[data.device_id].y = data.y;
+                drawAll();
+            }};
+
             canvas.style.cursor = 'grab';
-            draw();
+            drawAll();
         </script>
     </body>
     </html>
