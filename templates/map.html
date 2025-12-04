@@ -3,20 +3,83 @@
 <head>
     <title>Cat GPS - Map</title>
     <style>
-        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #1a1a2e; }
-        canvas { border: 1px solid #333; }
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #1a1a2e;
+        }
+
+        #map {
+            width: 100vw;
+            height: 100vh;
+            background: #16213e;
+            cursor: grab;
+        }
+
+        #map:active {
+            cursor: grabbing;
+        }
+
+        .room polygon {
+            stroke: #0f3460;
+            stroke-width: 1;
+        }
+
+        .room__label {
+            font-size: 10px;
+            font-family: sans-serif;
+            fill: #e0e0e0;
+            text-anchor: middle;
+            dominant-baseline: middle;
+            pointer-events: none;
+        }
+
+        .cat {
+            transition: transform 0.3s ease-out;
+        }
+
+        .cat__icon {
+            stroke: #fff;
+            stroke-width: 2;
+        }
+
+        .cat__label {
+            font-size: 12px;
+            font-weight: bold;
+            font-family: sans-serif;
+            fill: #fff;
+            text-anchor: middle;
+            pointer-events: none;
+        }
     </style>
 </head>
 <body>
-    <canvas id="map" width="800" height="600"></canvas>
+    <svg id="map" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet">
+        <g id="viewport">
+            <g id="rooms">
+                {% for room in rooms %}
+                <g class="room" data-room-id="{{ room.name }}">
+                    <polygon points="{% for point in room.svg_points %}{{ point[0] }},{{ point[1] }}{% if not loop.last %} {% endif %}{% endfor %}" style="fill: hsl({{ loop.index0 * 25 }}, 50%, 30%);" />
+                    <text class="room__label" x="{{ room.label_x }}" y="{{ room.label_y }}">{{ room.name }}</text>
+                </g>
+                {% endfor %}
+            </g>
+            <g id="cats"></g>
+        </g>
+    </svg>
     <script>
-        const rooms = {{ rooms | tojson }};
         const bounds = { minX: {{ min_x }}, minY: {{ min_y }}, maxX: {{ max_x }}, maxY: {{ max_y }} };
-        const canvas = document.getElementById('map');
-        const ctx = canvas.getContext('2d');
+        const svg = document.getElementById('map');
+        const viewport = document.getElementById('viewport');
+        const catsLayer = document.getElementById('cats');
 
-        const baseScaleX = canvas.width / (bounds.maxX - bounds.minX);
-        const baseScaleY = canvas.height / (bounds.maxY - bounds.minY);
+        const svgWidth = 800;
+        const svgHeight = 600;
+        const baseScaleX = svgWidth / (bounds.maxX - bounds.minX);
+        const baseScaleY = svgHeight / (bounds.maxY - bounds.minY);
         const baseScale = Math.min(baseScaleX, baseScaleY);
 
         let zoom = 1;
@@ -25,45 +88,21 @@
         let isDragging = false;
         let lastX, lastY;
 
-        function toCanvas(x, y) {
-            const sx = (x - bounds.minX) * baseScale * zoom + panX;
-            const sy = canvas.height - (y - bounds.minY) * baseScale * zoom + panY;
+        function toSvg(x, y) {
+            const sx = (x - bounds.minX) * baseScale;
+            const sy = svgHeight - (y - bounds.minY) * baseScale;
             return [sx, sy];
         }
 
-        function draw() {
-            ctx.fillStyle = '#16213e';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            rooms.forEach((room, i) => {
-                ctx.beginPath();
-                const [sx, sy] = toCanvas(room.points[0][0], room.points[0][1]);
-                ctx.moveTo(sx, sy);
-                room.points.slice(1).forEach(p => {
-                    const [px, py] = toCanvas(p[0], p[1]);
-                    ctx.lineTo(px, py);
-                });
-                ctx.closePath();
-                ctx.fillStyle = `hsl(${i * 25}, 50%, 30%)`;
-                ctx.fill();
-                ctx.strokeStyle = '#0f3460';
-                ctx.stroke();
-
-                const cx = room.points.reduce((s, p) => s + p[0], 0) / room.points.length;
-                const cy = room.points.reduce((s, p) => s + p[1], 0) / room.points.length;
-                const [tx, ty] = toCanvas(cx, cy);
-                ctx.fillStyle = '#e0e0e0';
-                ctx.font = '10px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(room.name, tx, ty);
-            });
+        function updateViewport() {
+            viewport.setAttribute('transform', `translate(${panX}, ${panY}) scale(${zoom})`);
         }
 
-        canvas.addEventListener('wheel', (e) => {
+        svg.addEventListener('wheel', (e) => {
             e.preventDefault();
-            const rect = canvas.getBoundingClientRect();
-            const mx = e.clientX - rect.left;
-            const my = e.clientY - rect.top;
+            const rect = svg.getBoundingClientRect();
+            const mx = (e.clientX - rect.left) * (svgWidth / rect.width);
+            const my = (e.clientY - rect.top) * (svgHeight / rect.height);
 
             const oldZoom = zoom;
             zoom *= e.deltaY < 0 ? 1.1 : 0.9;
@@ -71,77 +110,65 @@
 
             panX = mx - (mx - panX) * (zoom / oldZoom);
             panY = my - (my - panY) * (zoom / oldZoom);
-            drawAll();
+            updateViewport();
         });
 
-        canvas.addEventListener('mousedown', (e) => {
+        svg.addEventListener('mousedown', (e) => {
             isDragging = true;
             lastX = e.clientX;
             lastY = e.clientY;
-            canvas.style.cursor = 'grabbing';
         });
 
-        canvas.addEventListener('mousemove', (e) => {
+        svg.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
-            panX += e.clientX - lastX;
-            panY += e.clientY - lastY;
+            const rect = svg.getBoundingClientRect();
+            const scaleFactorX = svgWidth / rect.width;
+            const scaleFactorY = svgHeight / rect.height;
+            panX += (e.clientX - lastX) * scaleFactorX;
+            panY += (e.clientY - lastY) * scaleFactorY;
             lastX = e.clientX;
             lastY = e.clientY;
-            drawAll();
+            updateViewport();
         });
 
-        canvas.addEventListener('mouseup', () => {
-            isDragging = false;
-            canvas.style.cursor = 'grab';
-        });
-
-        canvas.addEventListener('mouseleave', () => {
-            isDragging = false;
-            canvas.style.cursor = 'grab';
-        });
+        svg.addEventListener('mouseup', () => { isDragging = false; });
+        svg.addEventListener('mouseleave', () => { isDragging = false; });
 
         const cats = {};
-
-        function drawCats() {
-            Object.values(cats).forEach(cat => {
-                const [cx, cy] = toCanvas(cat.x, cat.y);
-                ctx.beginPath();
-                ctx.arc(cx, cy, 8 * zoom, 0, Math.PI * 2);
-                ctx.fillStyle = cat.color;
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold 12px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(cat.name, cx, cy - 14 * zoom);
-            });
-        }
-
-        function drawAll() {
-            draw();
-            drawCats();
-        }
-
         const catColors = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3'];
         let colorIndex = 0;
+
+        function createCatElement(id, name, color) {
+            const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            g.classList.add('cat');
+            g.id = `cat-${id}`;
+            g.innerHTML = `
+                <circle class="cat__icon" r="8" fill="${color}" />
+                <text class="cat__label" y="-14">${name}</text>
+            `;
+            catsLayer.appendChild(g);
+            return g;
+        }
+
+        function updateCatPosition(id, x, y) {
+            const cat = cats[id];
+            if (!cat || !cat.element) return;
+            const [sx, sy] = toSvg(x, y);
+            cat.element.setAttribute('transform', `translate(${sx}, ${sy})`);
+        }
 
         const ws = new WebSocket(`ws://${location.host}/ws/positions`);
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
             if (!cats[data.device_id]) {
-                cats[data.device_id] = { color: catColors[colorIndex++ % catColors.length] };
+                const color = catColors[colorIndex++ % catColors.length];
+                const element = createCatElement(data.device_id, data.device_name, color);
+                cats[data.device_id] = { element, color };
             }
-            cats[data.device_id].name = data.device_name;
-            cats[data.device_id].x = data.x;
-            cats[data.device_id].y = data.y;
-            drawAll();
+            const label = cats[data.device_id].element.querySelector('.cat__label');
+            if (label) label.textContent = data.device_name;
+            updateCatPosition(data.device_id, data.x, data.y);
         };
-
-        canvas.style.cursor = 'grab';
-        drawAll();
     </script>
 </body>
 </html>

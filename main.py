@@ -136,21 +136,41 @@ async def health():
 
 @app.get("/map", response_class=HTMLResponse)
 async def map_page(request: Request):
+    bounds = config.floors[0].bounds
+    min_x, min_y = bounds[0].x, bounds[0].y
+    max_x, max_y = bounds[1].x, bounds[1].y
+
+    svg_width, svg_height = 800, 600
+    base_scale_x = svg_width / (max_x - min_x)
+    base_scale_y = svg_height / (max_y - min_y)
+    base_scale = min(base_scale_x, base_scale_y)
+
+    def to_svg(x: float, y: float) -> tuple[float, float]:
+        sx = (x - min_x) * base_scale
+        sy = svg_height - (y - min_y) * base_scale
+        return (sx, sy)
+
     rooms = []
     for floor in config.floors:
         for room in floor.rooms:
-            points = [[p.x, p.y] for p in room.points]
-            rooms.append({"name": room.name, "points": points})
+            svg_points = [to_svg(p.x, p.y) for p in room.points]
+            cx = sum(p[0] for p in svg_points) / len(svg_points)
+            cy = sum(p[1] for p in svg_points) / len(svg_points)
+            rooms.append({
+                "name": room.name,
+                "svg_points": svg_points,
+                "label_x": cx,
+                "label_y": cy,
+            })
 
-    bounds = config.floors[0].bounds
     return templates.TemplateResponse(
         request,
         "map.html",
         {
             "rooms": rooms,
-            "min_x": bounds[0].x,
-            "min_y": bounds[0].y,
-            "max_x": bounds[1].x,
-            "max_y": bounds[1].y,
+            "min_x": min_x,
+            "min_y": min_y,
+            "max_x": max_x,
+            "max_y": max_y,
         },
     )
