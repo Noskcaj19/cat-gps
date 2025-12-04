@@ -17,9 +17,26 @@ class PositionPoint:
     timestamp: datetime
 
 
+@dataclass
+class HeatmapBin:
+    grid_x: int
+    grid_y: int
+    count: int
+
+
 class TimeSeriesDB(ABC):
     @abstractmethod
     async def write_position(self, point: PositionPoint) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def query_positions(self, hours: int = 24) -> list[PositionPoint]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def query_heatmap(
+        self, hours: int = 24, cell_size: float = 0.5
+    ) -> list[HeatmapBin]:
         raise NotImplementedError
 
     async def aclose(self) -> None:
@@ -29,6 +46,14 @@ class TimeSeriesDB(ABC):
 class NoopTimeSeriesDB(TimeSeriesDB):
     async def write_position(self, point: PositionPoint) -> None:
         pass
+
+    async def query_positions(self, hours: int = 24) -> list[PositionPoint]:
+        return []
+
+    async def query_heatmap(
+        self, hours: int = 24, cell_size: float = 0.5
+    ) -> list[HeatmapBin]:
+        return []
 
 
 class InfluxTimeSeriesDB(TimeSeriesDB):
@@ -51,6 +76,50 @@ class InfluxTimeSeriesDB(TimeSeriesDB):
         )
         self._client.write(record=p)
 
+    async def query_positions(self, hours: int = 24) -> list[PositionPoint]:
+        query = f"""
+            SELECT time, device_id, device_name, x, y
+            FROM cat_position
+            WHERE time >= now() - interval '{hours} hours'
+        """
+        table = self._client.query(query=query, language="sql")
+        results = []
+        for batch in table.to_batches():
+            for i in range(batch.num_rows):
+                results.append(PositionPoint(
+                    device_id=str(batch.column("device_id")[i]),
+                    device_name=str(batch.column("device_name")[i]),
+                    x=float(batch.column("x")[i].as_py()),
+                    y=float(batch.column("y")[i].as_py()),
+                    timestamp=batch.column("time")[i].as_py(),
+                ))
+        return results
+
+    async def query_heatmap(
+        self, hours: int = 24, cell_size: float = 0.5
+    ) -> list[HeatmapBin]:
+        query = f"""
+            SELECT
+                CAST(FLOOR(x / {cell_size}) AS INT) AS grid_x,
+                CAST(FLOOR(y / {cell_size}) AS INT) AS grid_y,
+                COUNT(*) AS count
+            FROM cat_position
+            WHERE time >= now() - interval '{hours} hours'
+            GROUP BY
+                CAST(FLOOR(x / {cell_size}) AS INT),
+                CAST(FLOOR(y / {cell_size}) AS INT)
+        """
+        table = self._client.query(query=query, language="sql")
+        results = []
+        for batch in table.to_batches():
+            for i in range(batch.num_rows):
+                results.append(HeatmapBin(
+                    grid_x=int(batch.column("grid_x")[i].as_py()),
+                    grid_y=int(batch.column("grid_y")[i].as_py()),
+                    count=int(batch.column("count")[i].as_py()),
+                ))
+        return results
+
     async def aclose(self) -> None:
         self._client.close()
 
@@ -65,4 +134,6 @@ def create_tsdb_from_env() -> TimeSeriesDB:
         token = os.environ.get("TSDB_TOKEN")
         return InfluxTimeSeriesDB(host=host, port=port, database=database, token=token)
 
+    
+    print("Failed to select TSDB type")
     return NoopTimeSeriesDB()

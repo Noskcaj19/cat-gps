@@ -3,8 +3,8 @@ services:
     image: influxdb:3-core
     container_name: influxdb
     user: root
-    #ports:
-    #  - "8181:8181"
+    ports:
+      - "127.0.0.1:8181:8181"
     command:
       - influxdb3
       - serve

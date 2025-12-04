@@ -13,6 +13,9 @@ from paho.mqtt import client as mqtt_client
 from config import Config
 from tsdb import PositionPoint, TimeSeriesDB, create_tsdb_from_env
 
+from dotenv import load_dotenv
+load_dotenv()
+
 logger = logging.getLogger(__name__)
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")
@@ -140,7 +143,7 @@ app = FastAPI(title="Cat GPS", lifespan=lifespan)
 async def ws_positions(ws: WebSocket):
     await ws.accept()
     for pos in last_positions.values():
-        await ws.send_json(pos)
+        await ws.send_json({k: v for k, v in pos.items() if k != "timestamp"})
     ws_clients.add(ws)
     try:
         while True:
@@ -157,6 +160,17 @@ async def ws_positions(ws: WebSocket):
 @app.get("/health")
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/api/heatmap")
+async def heatmap_data(cell_size: float = 0.5):
+    if tsdb is None:
+        return {"bins": [], "cell_size": cell_size}
+    bins = await tsdb.query_heatmap(hours=24, cell_size=cell_size)
+    return {
+        "bins": [{"grid_x": b.grid_x, "grid_y": b.grid_y, "count": b.count} for b in bins],
+        "cell_size": cell_size,
+    }
 
 
 @app.get("/", response_class=HTMLResponse)

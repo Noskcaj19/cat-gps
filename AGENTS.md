@@ -6,13 +6,13 @@ The application is built using Python and fastapi and uses uv.
 
 The floorplan is defined by the config.yml file
 
-The server receives current data from a mqtt server
+The server receives current data from a mqtt server.
+
+# Debugging
+The server is running on port 8000 and the logs can be read by `docker compose logs --tail={lines}` and optionally filtering by container name
 
 # Scripts
 * view mqtt messages:
   * `mqtt sub -h chronos -t espresense/companion/+/attributes -u noskcaj --password 25581612`
 * Run anything python:
   * use `uv`
-* Run the server:
-  * `uv run fastapi dev main.py`
-

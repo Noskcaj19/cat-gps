@@ -41,6 +41,7 @@ dependencies = [
     { name = "influxdb3-python" },
     { name = "jinja2" },
     { name = "paho-mqtt" },
+    { name = "python-dotenv" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -60,6 +61,7 @@ requires-dist = [
     { name = "paho-mqtt", specifier = ">=2.1.0" },
     { name = "pytest", marker = "extra == 'dev'" },
     { name = "pytest-asyncio", marker = "extra == 'dev'" },
+    { name = "python-dotenv", specifier = ">=1.2.1" },
     { name = "uvicorn", extras = ["standard"] },
 ]
 provides-extras = ["dev"]

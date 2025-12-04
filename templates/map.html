@@ -104,9 +104,47 @@
         .node {
             fill: var(--node-color);
         }
+
+        .mode-selector {
+            position: fixed;
+            top: 16px;
+            left: 16px;
+            z-index: 100;
+            display: flex;
+            gap: 4px;
+            background: var(--map-bg);
+            border: 1px solid var(--room-stroke);
+            border-radius: 8px;
+            padding: 4px;
+        }
+
+        .mode-selector button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-family: sans-serif;
+            background: transparent;
+            color: var(--room-label-color);
+            transition: background 0.2s;
+        }
+
+        .mode-selector button:hover {
+            background: var(--room-stroke);
+        }
+
+        .mode-selector button.active {
+            background: #4ecdc4;
+            color: #111827;
+        }
     </style>
 </head>
 <body>
+    <div class="mode-selector">
+        <button id="mode-realtime" class="active">Real-time</button>
+        <button id="mode-heatmap">Heatmap (24h)</button>
+    </div>
     <svg id="map" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet">
         <g id="viewport">
             <g id="rooms">
@@ -127,6 +165,7 @@
                 {% endfor %}
             </g>
             <g id="cats"></g>
+            <g id="heatmap"></g>
         </g>
     </svg>
     <script>
@@ -197,6 +236,12 @@
         const catColors = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3'];
         let colorIndex = 0;
 
+        let currentMode = 'realtime';
+        const heatmapLayer = document.getElementById('heatmap');
+        const modeRealtimeBtn = document.getElementById('mode-realtime');
+        const modeHeatmapBtn = document.getElementById('mode-heatmap');
+        let ws = null;
+
         function createCatElement(id, name, color) {
             const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
             g.classList.add('cat');
@@ -216,19 +261,85 @@
             cat.element.setAttribute('transform', `translate(${sx}, ${sy})`);
         }
 
-        const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const ws = new WebSocket(`${wsProtocol}//${location.host}/ws/positions`);
-        ws.onmessage = (e) => {
-            const data = JSON.parse(e.data);
-            if (!cats[data.device_id]) {
-                const color = catColors[colorIndex++ % catColors.length];
-                const element = createCatElement(data.device_id, data.device_name, color);
-                cats[data.device_id] = { element, color };
+        function connectWebSocket() {
+            const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${wsProtocol}//${location.host}/ws/positions`);
+            ws.onmessage = (e) => {
+                if (currentMode !== 'realtime') return;
+                const data = JSON.parse(e.data);
+                if (!cats[data.device_id]) {
+                    const color = catColors[colorIndex++ % catColors.length];
+                    const element = createCatElement(data.device_id, data.device_name, color);
+                    cats[data.device_id] = { element, color };
+                }
+                const label = cats[data.device_id].element.querySelector('.cat__label');
+                if (label) label.textContent = data.device_name;
+                updateCatPosition(data.device_id, data.x, data.y);
+            };
+        }
+
+        function clearHeatmap() {
+            heatmapLayer.innerHTML = '';
+        }
+
+        function clearCats() {
+            catsLayer.innerHTML = '';
+            Object.keys(cats).forEach(k => delete cats[k]);
+            colorIndex = 0;
+        }
+
+        async function renderHeatmap() {
+            clearHeatmap();
+            const cellSize = 0.5;
+            const res = await fetch(`/api/heatmap?cell_size=${cellSize}`);
+            const data = await res.json();
+
+            if (data.bins.length === 0) return;
+
+            const maxCount = Math.max(...data.bins.map(b => b.count));
+
+            data.bins.forEach(bin => {
+                const worldX = bin.grid_x * cellSize;
+                const worldY = bin.grid_y * cellSize;
+                const [sx, sy] = toSvg(worldX, worldY);
+                const [sx2, sy2] = toSvg(worldX + cellSize, worldY + cellSize);
+                const width = Math.abs(sx2 - sx);
+                const height = Math.abs(sy2 - sy);
+
+                const intensity = bin.count / maxCount;
+                const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                rect.setAttribute('x', sx);
+                rect.setAttribute('y', sy2);
+                rect.setAttribute('width', width);
+                rect.setAttribute('height', height);
+                rect.setAttribute('fill', `rgba(255, 107, 107, ${0.1 + intensity * 0.7})`);
+                rect.setAttribute('rx', '2');
+                heatmapLayer.appendChild(rect);
+            });
+        }
+
+        function setMode(mode) {
+            currentMode = mode;
+            modeRealtimeBtn.classList.toggle('active', mode === 'realtime');
+            modeHeatmapBtn.classList.toggle('active', mode === 'heatmap');
+
+            if (mode === 'realtime') {
+                clearHeatmap();
+                catsLayer.style.display = '';
+                if (!ws || ws.readyState === WebSocket.CLOSED) {
+                    connectWebSocket();
+                }
+            } else {
+                clearCats();
+                catsLayer.style.display = 'none';
+                renderHeatmap();
             }
-            const label = cats[data.device_id].element.querySelector('.cat__label');
-            if (label) label.textContent = data.device_name;
-            updateCatPosition(data.device_id, data.x, data.y);
-        };
+        }
+
+        modeRealtimeBtn.addEventListener('click', () => setMode('realtime'));
+        modeHeatmapBtn.addEventListener('click', () => setMode('heatmap'));
+
+        connectWebSocket();
     </script>
 </body>
 </html>

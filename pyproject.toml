@@ -9,6 +9,7 @@ dependencies = [
     "influxdb3-python",
     "jinja2",
     "paho-mqtt>=2.1.0",
+    "python-dotenv>=1.2.1",
     "uvicorn[standard]",
 ]
 
