@@ -11,3 +11,10 @@ dependencies = [
     "paho-mqtt>=2.1.0",
     "uvicorn[standard]",
 ]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "httpx",
+]
