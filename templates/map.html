@@ -3,19 +3,59 @@
 <head>
     <title>Cat GPS - Map</title>
     <style>
+        :root {
+            color-scheme: light dark;
+
+            /* Page + map surfaces */
+            --page-bg: #f5f5f7;
+            --map-bg: #ffffff;
+
+            /* Rooms */
+            --room-stroke: #cbd5e1;
+            --room-fill-lightness: 72%;
+            --room-label-color: #111827;
+            --room-label-stroke: transparent;
+
+            /* Cats */
+            --cat-label-color: #111827;
+            --cat-label-stroke: transparent;
+            --cat-icon-stroke: #ffffff;
+
+            /* Misc */
+            --node-color: #9ca3af;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --page-bg: #020617;
+                --map-bg: #0b1120;
+                --room-stroke: #1f2937;
+                --room-fill-lightness: 25%;
+
+                --room-label-color: #e5e7eb;
+                --room-label-stroke: rgba(0, 0, 0, 0.85);
+
+                --cat-label-color: #f9fafb;
+                --cat-label-stroke: rgba(0, 0, 0, 0.85);
+
+                --cat-icon-stroke: #0b1120;
+                --node-color: #9ca3af;
+            }
+        }
+
         body {
             margin: 0;
             display: flex;
             justify-content: center;
             align-items: center;
             height: 100vh;
-            background: #1a1a2e;
+            background: var(--page-bg);
         }
 
         #map {
             width: 100vw;
             height: 100vh;
-            background: #16213e;
+            background: var(--map-bg);
             cursor: grab;
         }
 
@@ -24,17 +64,20 @@
         }
 
         .room polygon {
-            stroke: #0f3460;
+            stroke: var(--room-stroke);
             stroke-width: 1;
         }
 
         .room__label {
             font-size: 10px;
             font-family: sans-serif;
-            fill: #e0e0e0;
+            fill: var(--room-label-color);
             text-anchor: middle;
             dominant-baseline: middle;
             pointer-events: none;
+            paint-order: stroke fill;
+            stroke: var(--room-label-stroke);
+            stroke-width: 2px;
         }
 
         .cat {
@@ -42,7 +85,7 @@
         }
 
         .cat__icon {
-            stroke: #fff;
+            stroke: var(--cat-icon-stroke);
             stroke-width: 2;
         }
 
@@ -50,13 +93,16 @@
             font-size: 12px;
             font-weight: bold;
             font-family: sans-serif;
-            fill: #fff;
+            fill: var(--cat-label-color);
             text-anchor: middle;
             pointer-events: none;
+            paint-order: stroke fill;
+            stroke: var(--cat-label-stroke);
+            stroke-width: 2px;
         }
 
         .node {
-            fill: #888;
+            fill: var(--node-color);
         }
     </style>
 </head>
@@ -66,7 +112,7 @@
             <g id="rooms">
                 {% for room in rooms %}
                 <g class="room" data-room-id="{{ room.name }}">
-                    <polygon points="{% for point in room.svg_points %}{{ point[0] }},{{ point[1] }}{% if not loop.last %} {% endif %}{% endfor %}" style="fill: hsl({{ loop.index0 * 25 }}, 50%, 30%);" />
+                    <polygon points="{% for point in room.svg_points %}{{ point[0] }},{{ point[1] }}{% if not loop.last %} {% endif %}{% endfor %}" style="fill: hsl({{ loop.index0 * 25 }}, 55%, var(--room-fill-lightness));" />
                 </g>
                 {% endfor %}
             </g>
