@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
     "fastapi[standard]",
+    "jinja2",
     "paho-mqtt>=2.1.0",
     "uvicorn[standard]",
 ]
