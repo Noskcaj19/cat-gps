@@ -306,6 +306,31 @@
         .time-preset-btn:hover {
             background: var(--room-stroke);
         }
+
+        .cat-legend {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            margin-left: 12px;
+            padding-left: 12px;
+            border-left: 1px solid var(--room-stroke);
+        }
+
+        .cat-legend__item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-family: sans-serif;
+            color: var(--room-label-color);
+        }
+
+        .cat-legend__swatch {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
     </style>
 </head>
 <body>
@@ -636,7 +661,10 @@
                     const color = getDeviceColor(selectedDevice);
                     await renderHeatmapForDevice(cellSize, selectedDevice, color, timeParams, signal);
                 } else {
-                    await renderHeatmapForDevice(cellSize, null, '#ff6b6b', timeParams, signal);
+                    for (const d of devices) {
+                        const color = getDeviceColor(d.id);
+                        await renderHeatmapForDevice(cellSize, d.id, color, timeParams, signal);
+                    }
                 }
             } catch (e) {
                 if (e.name !== 'AbortError') throw e;
@@ -732,6 +760,21 @@
                 label.innerHTML = `<input type="radio" name="cat-select" value="${d.id}"> ${d.name}`;
                 catFilterDiv.appendChild(label);
             });
+
+            const legend = document.createElement('div');
+            legend.className = 'cat-legend';
+            devices.forEach(d => {
+                const color = getDeviceColor(d.id);
+                const item = document.createElement('div');
+                item.className = 'cat-legend__item';
+                const swatch = document.createElement('span');
+                swatch.className = 'cat-legend__swatch';
+                swatch.style.backgroundColor = color;
+                item.appendChild(swatch);
+                item.appendChild(document.createTextNode(d.name));
+                legend.appendChild(item);
+            });
+            catFilterDiv.appendChild(legend);
 
             catFilterDiv.addEventListener('change', () => {
                 if (currentMode === 'heatmap') {
@@ -854,13 +897,15 @@
         modeRealtimeBtn.addEventListener('click', () => setMode('realtime'));
         modeHeatmapBtn.addEventListener('click', () => setMode('heatmap'));
 
-        loadDevices();
-        const initialMode = getModeFromUrl();
-        if (initialMode === 'heatmap') {
-            setMode('heatmap', false);
-        } else {
-            connectWebSocket();
-        }
+        (async () => {
+            await loadDevices();
+            const initialMode = getModeFromUrl();
+            if (initialMode === 'heatmap') {
+                setMode('heatmap', false);
+            } else {
+                connectWebSocket();
+            }
+        })();
     </script>
 </body>
 </html>
