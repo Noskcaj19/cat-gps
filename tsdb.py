@@ -39,7 +39,12 @@ class TimeSeriesDB(ABC):
 
     @abstractmethod
     async def query_heatmap(
-        self, hours: int = 24, cell_size: float = 0.5, device_id: str | None = None
+        self,
+        hours: int = 24,
+        cell_size: float = 0.5,
+        device_id: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> list[HeatmapBin]:
         raise NotImplementedError
 
@@ -55,7 +60,12 @@ class NoopTimeSeriesDB(TimeSeriesDB):
         return []
 
     async def query_heatmap(
-        self, hours: int = 24, cell_size: float = 0.5, device_id: str | None = None
+        self,
+        hours: int = 24,
+        cell_size: float = 0.5,
+        device_id: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> list[HeatmapBin]:
         return []
 
@@ -100,16 +110,25 @@ class InfluxTimeSeriesDB(TimeSeriesDB):
         return results
 
     async def query_heatmap(
-        self, hours: int = 24, cell_size: float = 0.5, device_id: str | None = None
+        self,
+        hours: int = 24,
+        cell_size: float = 0.5,
+        device_id: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> list[HeatmapBin]:
         device_filter = f"AND device_id = '{device_id}'" if device_id else ""
+        if start_time and end_time:
+            time_filter = f"time >= '{start_time.isoformat()}' AND time <= '{end_time.isoformat()}'"
+        else:
+            time_filter = f"time >= now() - interval '{hours} hours'"
         query = f"""
             SELECT
                 CAST(FLOOR(x / {cell_size}) AS INT) AS grid_x,
                 CAST(FLOOR(y / {cell_size}) AS INT) AS grid_y,
                 COUNT(*) AS count
             FROM cat_position
-            WHERE time >= now() - interval '{hours} hours'
+            WHERE {time_filter}
             {device_filter}
             GROUP BY
                 CAST(FLOOR(x / {cell_size}) AS INT),

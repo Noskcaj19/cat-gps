@@ -170,12 +170,72 @@
         .cat-filter input[type="radio"] {
             cursor: pointer;
         }
+
+        .time-range-selector {
+            position: fixed;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100;
+            display: none;
+            background: var(--map-bg);
+            border: 1px solid var(--room-stroke);
+            border-radius: 8px;
+            padding: 8px 12px;
+        }
+
+        .time-range-selector.visible {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .time-range-selector label {
+            font-size: 14px;
+            font-family: sans-serif;
+            color: var(--room-label-color);
+        }
+
+        .time-range-selector select,
+        .time-range-selector input[type="datetime-local"] {
+            padding: 6px 10px;
+            border: 1px solid var(--room-stroke);
+            border-radius: 6px;
+            background: var(--map-bg);
+            color: var(--room-label-color);
+            font-size: 14px;
+            font-family: sans-serif;
+            cursor: pointer;
+        }
+
+        .time-range-selector span {
+            color: var(--room-label-color);
+            font-family: sans-serif;
+            font-size: 14px;
+        }
     </style>
 </head>
 <body>
     <div class="mode-selector">
         <button id="mode-realtime" class="active">Real-time</button>
         <button id="mode-heatmap">Heatmap (24h)</button>
+    </div>
+    <div class="time-range-selector" id="time-range-selector">
+        <label for="time-range">Time range:</label>
+        <select id="time-range">
+            <option value="1">1 hour</option>
+            <option value="6">6 hours</option>
+            <option value="12">12 hours</option>
+            <option value="24" selected>24 hours</option>
+            <option value="48">48 hours</option>
+            <option value="168">7 days</option>
+            <option value="custom">Custom...</option>
+        </select>
+        <div id="custom-range" style="display: none; margin-left: 8px; gap: 8px; align-items: center;">
+            <input type="datetime-local" id="start-time">
+            <span>to</span>
+            <input type="datetime-local" id="end-time">
+        </div>
     </div>
     <div class="cat-filter" id="cat-filter">
         <label>
@@ -279,12 +339,33 @@
         const modeRealtimeBtn = document.getElementById('mode-realtime');
         const modeHeatmapBtn = document.getElementById('mode-heatmap');
         const catFilterDiv = document.getElementById('cat-filter');
+        const timeRangeSelectorDiv = document.getElementById('time-range-selector');
+        const timeRangeSelect = document.getElementById('time-range');
+        const customRangeDiv = document.getElementById('custom-range');
+        const startTimeInput = document.getElementById('start-time');
+        const endTimeInput = document.getElementById('end-time');
         let ws = null;
         let devices = [];
 
         function getSelectedDevice() {
             const checked = document.querySelector('input[name="cat-select"]:checked');
             return checked ? checked.value : '';
+        }
+
+        function getSelectedHours() {
+            return parseInt(timeRangeSelect.value, 10) || 24;
+        }
+
+        function getTimeRangeParams() {
+            if (timeRangeSelect.value === 'custom') {
+                const start = startTimeInput.value;
+                const end = endTimeInput.value;
+                if (start && end) {
+                    return { start_time: new Date(start).toISOString(), end_time: new Date(end).toISOString() };
+                }
+                return { hours: 24 };
+            }
+            return { hours: getSelectedHours() };
         }
 
         function createCatElement(id, name, color) {
@@ -342,17 +423,24 @@
             clearHeatmap();
             const cellSize = 0.5;
             const selectedDevice = getSelectedDevice();
+            const timeParams = getTimeRangeParams();
 
             if (selectedDevice) {
                 const color = getDeviceColor(selectedDevice);
-                await renderHeatmapForDevice(cellSize, selectedDevice, color);
+                await renderHeatmapForDevice(cellSize, selectedDevice, color, timeParams);
             } else {
-                await renderHeatmapForDevice(cellSize, null, '#ff6b6b');
+                await renderHeatmapForDevice(cellSize, null, '#ff6b6b', timeParams);
             }
         }
 
-        async function renderHeatmapForDevice(cellSize, deviceId, color) {
+        async function renderHeatmapForDevice(cellSize, deviceId, color, timeParams) {
             let url = `/api/heatmap?cell_size=${cellSize}`;
+            if (timeParams.hours) {
+                url += `&hours=${timeParams.hours}`;
+            }
+            if (timeParams.start_time && timeParams.end_time) {
+                url += `&start_time=${encodeURIComponent(timeParams.start_time)}&end_time=${encodeURIComponent(timeParams.end_time)}`;
+            }
             if (deviceId) {
                 url += `&device_id=${encodeURIComponent(deviceId)}`;
             }
@@ -399,6 +487,7 @@
             modeRealtimeBtn.classList.toggle('active', mode === 'realtime');
             modeHeatmapBtn.classList.toggle('active', mode === 'heatmap');
             catFilterDiv.classList.toggle('visible', mode === 'heatmap');
+            timeRangeSelectorDiv.classList.toggle('visible', mode === 'heatmap');
 
             if (updateUrl) {
                 const url = new URL(location.href);
@@ -440,6 +529,35 @@
                 }
             });
         }
+
+        timeRangeSelect.addEventListener('change', () => {
+            const isCustom = timeRangeSelect.value === 'custom';
+            customRangeDiv.style.display = isCustom ? 'flex' : 'none';
+            if (currentMode === 'heatmap' && !isCustom) {
+                renderHeatmap();
+            }
+        });
+
+        function initCustomTimeDefaults() {
+            const now = new Date();
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            const toLocalISO = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            endTimeInput.value = toLocalISO(now);
+            startTimeInput.value = toLocalISO(yesterday);
+        }
+        initCustomTimeDefaults();
+
+        startTimeInput.addEventListener('change', () => {
+            if (currentMode === 'heatmap' && startTimeInput.value && endTimeInput.value) {
+                renderHeatmap();
+            }
+        });
+
+        endTimeInput.addEventListener('change', () => {
+            if (currentMode === 'heatmap' && startTimeInput.value && endTimeInput.value) {
+                renderHeatmap();
+            }
+        });
 
         modeRealtimeBtn.addEventListener('click', () => setMode('realtime'));
         modeHeatmapBtn.addEventListener('click', () => setMode('heatmap'));
