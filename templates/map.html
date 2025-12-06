@@ -394,11 +394,17 @@
             });
         }
 
-        function setMode(mode) {
+        function setMode(mode, updateUrl = true) {
             currentMode = mode;
             modeRealtimeBtn.classList.toggle('active', mode === 'realtime');
             modeHeatmapBtn.classList.toggle('active', mode === 'heatmap');
             catFilterDiv.classList.toggle('visible', mode === 'heatmap');
+
+            if (updateUrl) {
+                const url = new URL(location.href);
+                url.searchParams.set('view', mode);
+                history.replaceState(null, '', url);
+            }
 
             if (mode === 'realtime') {
                 clearHeatmap();
@@ -411,6 +417,12 @@
                 catsLayer.style.display = 'none';
                 renderHeatmap();
             }
+        }
+
+        function getModeFromUrl() {
+            const params = new URLSearchParams(location.search);
+            const view = params.get('view');
+            return view === 'heatmap' ? 'heatmap' : 'realtime';
         }
 
         async function loadDevices() {
@@ -433,7 +445,12 @@
         modeHeatmapBtn.addEventListener('click', () => setMode('heatmap'));
 
         loadDevices();
-        connectWebSocket();
+        const initialMode = getModeFromUrl();
+        if (initialMode === 'heatmap') {
+            setMode('heatmap', false);
+        } else {
+            connectWebSocket();
+        }
     </script>
 </body>
 </html>
