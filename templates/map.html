@@ -346,6 +346,9 @@
         const endTimeInput = document.getElementById('end-time');
         let ws = null;
         let devices = [];
+        let reconnectAttempts = 0;
+        let reconnectTimeout = null;
+        const MAX_RECONNECT_DELAY = 30000;
 
         function getSelectedDevice() {
             const checked = document.querySelector('input[name="cat-select"]:checked');
@@ -387,9 +390,31 @@
             cat.element.setAttribute('transform', `translate(${sx}, ${sy})`);
         }
 
+        function scheduleReconnect() {
+            if (reconnectTimeout) return;
+            const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY);
+            reconnectAttempts++;
+            console.log(`WebSocket reconnecting in ${delay}ms (attempt ${reconnectAttempts})`);
+            reconnectTimeout = setTimeout(() => {
+                reconnectTimeout = null;
+                if (currentMode === 'realtime') {
+                    connectWebSocket();
+                }
+            }, delay);
+        }
+
         function connectWebSocket() {
+            if (ws && (ws.readyState === WebSocket.CONNECTING || ws.readyState === WebSocket.OPEN)) {
+                return;
+            }
             const wsProtocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
             ws = new WebSocket(`${wsProtocol}//${location.host}/ws/positions`);
+
+            ws.onopen = () => {
+                console.log('WebSocket connected');
+                reconnectAttempts = 0;
+            };
+
             ws.onmessage = (e) => {
                 if (currentMode !== 'realtime') return;
                 const data = JSON.parse(e.data);
@@ -402,7 +427,35 @@
                 if (label) label.textContent = data.device_name;
                 updateCatPosition(data.device_id, data.x, data.y);
             };
+
+            ws.onclose = () => {
+                console.log('WebSocket closed');
+                if (currentMode === 'realtime') {
+                    scheduleReconnect();
+                }
+            };
+
+            ws.onerror = (err) => {
+                console.error('WebSocket error', err);
+                ws.close();
+            };
         }
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && currentMode === 'realtime') {
+                if (!ws || ws.readyState === WebSocket.CLOSED) {
+                    reconnectAttempts = 0;
+                    connectWebSocket();
+                }
+            }
+        });
+
+        window.addEventListener('online', () => {
+            if (currentMode === 'realtime' && (!ws || ws.readyState === WebSocket.CLOSED)) {
+                reconnectAttempts = 0;
+                connectWebSocket();
+            }
+        });
 
         function clearHeatmap() {
             heatmapLayer.innerHTML = '';
