@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import logging.config
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -11,11 +12,13 @@ from fastapi.templating import Jinja2Templates
 from paho.mqtt import client as mqtt_client
 
 from config import Config
+from logging_config import LOGGING_CONFIG
 from tsdb import PositionPoint, TimeSeriesDB, create_tsdb_from_env
 
 from dotenv import load_dotenv
 load_dotenv()
 
+logging.config.dictConfig(LOGGING_CONFIG)
 logger = logging.getLogger(__name__)
 
 templates = Jinja2Templates(directory=Path(__file__).parent / "templates")

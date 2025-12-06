@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import logging
 import os
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 
 from influxdb_client_3 import InfluxDBClient3, Point, WritePrecision
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -111,6 +115,7 @@ class InfluxTimeSeriesDB(TimeSeriesDB):
                 CAST(FLOOR(x / {cell_size}) AS INT),
                 CAST(FLOOR(y / {cell_size}) AS INT)
         """
+        start_time = time.monotonic()
         table = self._client.query(query=query, language="sql")
         results = []
         for batch in table.to_batches():
@@ -120,6 +125,8 @@ class InfluxTimeSeriesDB(TimeSeriesDB):
                     grid_y=int(batch.column("grid_y")[i].as_py()),
                     count=int(batch.column("count")[i].as_py()),
                 ))
+        duration_ms = (time.monotonic() - start_time) * 1000
+        logger.info(f"Heatmap query executed in {duration_ms:.2f}ms")
         return results
 
     async def aclose(self) -> None:
