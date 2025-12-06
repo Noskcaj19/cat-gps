@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Cat GPS - Map</title>
     <style>
         :root {
@@ -330,6 +332,119 @@
             width: 12px;
             height: 12px;
             border-radius: 3px;
+        }
+
+        /* Mobile responsive styles */
+        @media (max-width: 600px) {
+            .mode-selector {
+                top: 8px;
+                left: 8px;
+                padding: 2px;
+            }
+
+            .mode-selector button {
+                padding: 6px 12px;
+                font-size: 12px;
+            }
+
+            .time-range-selector {
+                position: fixed;
+                top: auto;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                transform: none;
+                border-radius: 16px 16px 0 0;
+                padding: 12px;
+                flex-direction: column;
+                gap: 12px;
+                max-height: 50vh;
+                overflow-y: auto;
+            }
+
+            .time-range-selector select {
+                width: 100%;
+            }
+
+            #custom-range {
+                flex-direction: column !important;
+                align-items: stretch !important;
+                gap: 12px !important;
+            }
+
+            #custom-range > span {
+                text-align: center;
+            }
+
+            .time-adjust-group {
+                width: 100%;
+            }
+
+            .time-adjust-group input[type="datetime-local"] {
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            /* Hide +/- adjustment buttons on mobile - use native picker */
+            .time-adjust-row,
+            .time-adjust-labels {
+                display: none !important;
+            }
+
+            .both-adjust {
+                display: none !important;
+            }
+
+            .time-presets {
+                margin-left: 0;
+                padding-left: 0;
+                border-left: none;
+                padding-top: 8px;
+                border-top: 1px solid var(--room-stroke);
+                width: 100%;
+            }
+
+            .time-presets .time-adjust-row {
+                display: flex !important;
+                justify-content: center;
+                gap: 8px;
+            }
+
+            .time-preset-btn {
+                flex: 1;
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+
+            .cat-filter {
+                position: fixed;
+                top: 8px;
+                right: 8px;
+                left: auto;
+                flex-direction: column;
+                padding: 6px 10px;
+                gap: 6px;
+            }
+
+            .cat-filter label {
+                font-size: 12px;
+            }
+
+            .cat-legend {
+                margin-left: 0;
+                padding-left: 0;
+                border-left: none;
+                margin-top: 6px;
+                padding-top: 6px;
+                border-top: 1px solid var(--room-stroke);
+                flex-direction: row;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .cat-legend__item {
+                font-size: 11px;
+            }
         }
     </style>
 </head>
