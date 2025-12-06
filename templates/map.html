@@ -218,7 +218,7 @@
 <body>
     <div class="mode-selector">
         <button id="mode-realtime" class="active">Real-time</button>
-        <button id="mode-heatmap">Heatmap (24h)</button>
+        <button id="mode-heatmap">Heatmap</button>
     </div>
     <div class="time-range-selector" id="time-range-selector">
         <label for="time-range">Time range:</label>
@@ -530,9 +530,26 @@
             });
         }
 
+        function updateTimeRangeUrl() {
+            const url = new URL(location.href);
+            if (timeRangeSelect.value === 'custom') {
+                url.searchParams.set('range', 'custom');
+                if (startTimeInput.value) url.searchParams.set('start', startTimeInput.value);
+                if (endTimeInput.value) url.searchParams.set('end', endTimeInput.value);
+                url.searchParams.delete('hours');
+            } else {
+                url.searchParams.set('hours', timeRangeSelect.value);
+                url.searchParams.delete('range');
+                url.searchParams.delete('start');
+                url.searchParams.delete('end');
+            }
+            history.replaceState(null, '', url);
+        }
+
         timeRangeSelect.addEventListener('change', () => {
             const isCustom = timeRangeSelect.value === 'custom';
             customRangeDiv.style.display = isCustom ? 'flex' : 'none';
+            updateTimeRangeUrl();
             if (currentMode === 'heatmap' && !isCustom) {
                 renderHeatmap();
             }
@@ -545,15 +562,37 @@
             endTimeInput.value = toLocalISO(now);
             startTimeInput.value = toLocalISO(yesterday);
         }
-        initCustomTimeDefaults();
+
+        function loadTimeRangeFromUrl() {
+            const params = new URLSearchParams(location.search);
+            const range = params.get('range');
+            const hours = params.get('hours');
+            const start = params.get('start');
+            const end = params.get('end');
+
+            if (range === 'custom' && start && end) {
+                timeRangeSelect.value = 'custom';
+                startTimeInput.value = start;
+                endTimeInput.value = end;
+                customRangeDiv.style.display = 'flex';
+            } else if (hours && [...timeRangeSelect.options].some(o => o.value === hours)) {
+                timeRangeSelect.value = hours;
+                initCustomTimeDefaults();
+            } else {
+                initCustomTimeDefaults();
+            }
+        }
+        loadTimeRangeFromUrl();
 
         startTimeInput.addEventListener('change', () => {
+            updateTimeRangeUrl();
             if (currentMode === 'heatmap' && startTimeInput.value && endTimeInput.value) {
                 renderHeatmap();
             }
         });
 
         endTimeInput.addEventListener('change', () => {
+            updateTimeRangeUrl();
             if (currentMode === 'heatmap' && startTimeInput.value && endTimeInput.value) {
                 renderHeatmap();
             }
