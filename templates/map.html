@@ -495,6 +495,7 @@
         let reconnectAttempts = 0;
         let reconnectTimeout = null;
         const MAX_RECONNECT_DELAY = 30000;
+        let heatmapAbortController = null;
 
         function getSelectedDevice() {
             const checked = document.querySelector('input[name="cat-select"]:checked');
@@ -619,20 +620,30 @@
         }
 
         async function renderHeatmap() {
+            if (heatmapAbortController) {
+                heatmapAbortController.abort();
+            }
+            heatmapAbortController = new AbortController();
+            const signal = heatmapAbortController.signal;
+
             clearHeatmap();
             const cellSize = 0.5;
             const selectedDevice = getSelectedDevice();
             const timeParams = getTimeRangeParams();
 
-            if (selectedDevice) {
-                const color = getDeviceColor(selectedDevice);
-                await renderHeatmapForDevice(cellSize, selectedDevice, color, timeParams);
-            } else {
-                await renderHeatmapForDevice(cellSize, null, '#ff6b6b', timeParams);
+            try {
+                if (selectedDevice) {
+                    const color = getDeviceColor(selectedDevice);
+                    await renderHeatmapForDevice(cellSize, selectedDevice, color, timeParams, signal);
+                } else {
+                    await renderHeatmapForDevice(cellSize, null, '#ff6b6b', timeParams, signal);
+                }
+            } catch (e) {
+                if (e.name !== 'AbortError') throw e;
             }
         }
 
-        async function renderHeatmapForDevice(cellSize, deviceId, color, timeParams) {
+        async function renderHeatmapForDevice(cellSize, deviceId, color, timeParams, signal) {
             let url = `/api/heatmap?cell_size=${cellSize}`;
             if (timeParams.hours) {
                 url += `&hours=${timeParams.hours}`;
@@ -643,7 +654,7 @@
             if (deviceId) {
                 url += `&device_id=${encodeURIComponent(deviceId)}`;
             }
-            const res = await fetch(url);
+            const res = await fetch(url, { signal });
             const data = await res.json();
 
             if (data.bins.length === 0) return;
