@@ -275,6 +275,37 @@
             color: var(--room-label-color);
             font-family: sans-serif;
         }
+
+        .time-presets {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            margin-left: 8px;
+            padding-left: 8px;
+            border-left: 1px solid var(--room-stroke);
+        }
+
+        .time-presets-label {
+            font-size: 10px;
+            color: var(--room-label-color);
+            font-family: sans-serif;
+        }
+
+        .time-preset-btn {
+            padding: 4px 8px;
+            border: 1px solid var(--room-stroke);
+            border-radius: 4px;
+            background: var(--map-bg);
+            color: var(--room-label-color);
+            font-size: 11px;
+            font-family: sans-serif;
+            cursor: pointer;
+        }
+
+        .time-preset-btn:hover {
+            background: var(--room-stroke);
+        }
     </style>
 </head>
 <body>
@@ -336,6 +367,19 @@
                     <button class="time-adjust-btn" data-target="both" data-unit="minute" data-delta="-1">−</button>
                 </div>
                 <div class="time-adjust-labels"><span>D</span><span>H</span><span>M</span></div>
+            </div>
+            <div class="time-presets">
+                <span class="time-presets-label">Presets</span>
+                <div class="time-adjust-row">
+                    <button class="time-preset-btn" data-hours="1">1h</button>
+                    <button class="time-preset-btn" data-hours="6">6h</button>
+                    <button class="time-preset-btn" data-hours="12">12h</button>
+                </div>
+                <div class="time-adjust-row">
+                    <button class="time-preset-btn" data-hours="24">1d</button>
+                    <button class="time-preset-btn" data-hours="48">2d</button>
+                    <button class="time-preset-btn" data-hours="168">7d</button>
+                </div>
             </div>
         </div>
     </div>
@@ -762,6 +806,21 @@
             const toLocalISO = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
             input.value = toLocalISO(date);
         }
+
+        document.querySelectorAll('.time-preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const hours = parseInt(btn.dataset.hours, 10);
+                const now = new Date();
+                const start = new Date(now.getTime() - hours * 60 * 60 * 1000);
+                const toLocalISO = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                startTimeInput.value = toLocalISO(start);
+                endTimeInput.value = toLocalISO(now);
+                updateTimeRangeUrl();
+                if (currentMode === 'heatmap') {
+                    renderHeatmap();
+                }
+            });
+        });
 
         document.querySelectorAll('.time-adjust-btn').forEach(btn => {
             btn.addEventListener('click', () => {
