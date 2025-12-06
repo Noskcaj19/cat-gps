@@ -85,7 +85,7 @@ def test_heatmap_endpoint_with_data(mock_config):
 
     class MockTSDB(NoopTimeSeriesDB):
         async def query_heatmap(
-            self, hours: int = 24, cell_size: float = 0.5
+            self, hours: int = 24, cell_size: float = 0.5, device_id: str | None = None
         ) -> list[HeatmapBin]:
             return [
                 HeatmapBin(grid_x=5, grid_y=6, count=10),

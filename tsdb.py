@@ -35,7 +35,7 @@ class TimeSeriesDB(ABC):
 
     @abstractmethod
     async def query_heatmap(
-        self, hours: int = 24, cell_size: float = 0.5
+        self, hours: int = 24, cell_size: float = 0.5, device_id: str | None = None
     ) -> list[HeatmapBin]:
         raise NotImplementedError
 
@@ -51,7 +51,7 @@ class NoopTimeSeriesDB(TimeSeriesDB):
         return []
 
     async def query_heatmap(
-        self, hours: int = 24, cell_size: float = 0.5
+        self, hours: int = 24, cell_size: float = 0.5, device_id: str | None = None
     ) -> list[HeatmapBin]:
         return []
 
@@ -96,8 +96,9 @@ class InfluxTimeSeriesDB(TimeSeriesDB):
         return results
 
     async def query_heatmap(
-        self, hours: int = 24, cell_size: float = 0.5
+        self, hours: int = 24, cell_size: float = 0.5, device_id: str | None = None
     ) -> list[HeatmapBin]:
+        device_filter = f"AND device_id = '{device_id}'" if device_id else ""
         query = f"""
             SELECT
                 CAST(FLOOR(x / {cell_size}) AS INT) AS grid_x,
@@ -105,6 +106,7 @@ class InfluxTimeSeriesDB(TimeSeriesDB):
                 COUNT(*) AS count
             FROM cat_position
             WHERE time >= now() - interval '{hours} hours'
+            {device_filter}
             GROUP BY
                 CAST(FLOOR(x / {cell_size}) AS INT),
                 CAST(FLOOR(y / {cell_size}) AS INT)

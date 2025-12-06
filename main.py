@@ -163,14 +163,19 @@ async def health():
 
 
 @app.get("/api/heatmap")
-async def heatmap_data(cell_size: float = 0.5):
+async def heatmap_data(cell_size: float = 0.5, device_id: str | None = None):
     if tsdb is None:
         return {"bins": [], "cell_size": cell_size}
-    bins = await tsdb.query_heatmap(hours=24, cell_size=cell_size)
+    bins = await tsdb.query_heatmap(hours=24, cell_size=cell_size, device_id=device_id)
     return {
         "bins": [{"grid_x": b.grid_x, "grid_y": b.grid_y, "count": b.count} for b in bins],
         "cell_size": cell_size,
     }
+
+
+@app.get("/api/devices")
+async def list_devices():
+    return [{"id": d.id, "name": d.name} for d in config.devices]
 
 
 @app.get("/", response_class=HTMLResponse)

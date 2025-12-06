@@ -138,12 +138,50 @@
             background: #4ecdc4;
             color: #111827;
         }
+
+        .cat-filter {
+            position: fixed;
+            top: 16px;
+            right: 16px;
+            z-index: 100;
+            display: none;
+            background: var(--map-bg);
+            border: 1px solid var(--room-stroke);
+            border-radius: 8px;
+            padding: 8px 12px;
+        }
+
+        .cat-filter.visible {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .cat-filter label {
+            font-size: 14px;
+            font-family: sans-serif;
+            color: var(--room-label-color);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .cat-filter input[type="radio"] {
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
     <div class="mode-selector">
         <button id="mode-realtime" class="active">Real-time</button>
         <button id="mode-heatmap">Heatmap (24h)</button>
+    </div>
+    <div class="cat-filter" id="cat-filter">
+        <label>
+            <input type="radio" name="cat-select" value="" checked>
+            Both
+        </label>
     </div>
     <svg id="map" viewBox="0 0 800 600" preserveAspectRatio="xMidYMid meet">
         <g id="viewport">
@@ -240,7 +278,14 @@
         const heatmapLayer = document.getElementById('heatmap');
         const modeRealtimeBtn = document.getElementById('mode-realtime');
         const modeHeatmapBtn = document.getElementById('mode-heatmap');
+        const catFilterDiv = document.getElementById('cat-filter');
         let ws = null;
+        let devices = [];
+
+        function getSelectedDevice() {
+            const checked = document.querySelector('input[name="cat-select"]:checked');
+            return checked ? checked.value : '';
+        }
 
         function createCatElement(id, name, color) {
             const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -288,15 +333,46 @@
             colorIndex = 0;
         }
 
+        function getDeviceColor(deviceId) {
+            const idx = devices.findIndex(d => d.id === deviceId);
+            return catColors[idx >= 0 ? idx % catColors.length : 0];
+        }
+
         async function renderHeatmap() {
             clearHeatmap();
             const cellSize = 0.5;
-            const res = await fetch(`/api/heatmap?cell_size=${cellSize}`);
+            const selectedDevice = getSelectedDevice();
+
+            if (selectedDevice) {
+                const color = getDeviceColor(selectedDevice);
+                await renderHeatmapForDevice(cellSize, selectedDevice, color);
+            } else {
+                await renderHeatmapForDevice(cellSize, null, '#ff6b6b');
+            }
+        }
+
+        async function renderHeatmapForDevice(cellSize, deviceId, color) {
+            let url = `/api/heatmap?cell_size=${cellSize}`;
+            if (deviceId) {
+                url += `&device_id=${encodeURIComponent(deviceId)}`;
+            }
+            const res = await fetch(url);
             const data = await res.json();
 
             if (data.bins.length === 0) return;
 
             const maxCount = Math.max(...data.bins.map(b => b.count));
+
+            const hexToRgb = (hex) => {
+                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                return result ? {
+                    r: parseInt(result[1], 16),
+                    g: parseInt(result[2], 16),
+                    b: parseInt(result[3], 16)
+                } : { r: 255, g: 107, b: 107 };
+            };
+
+            const rgb = hexToRgb(color);
 
             data.bins.forEach(bin => {
                 const worldX = bin.grid_x * cellSize;
@@ -312,7 +388,7 @@
                 rect.setAttribute('y', sy2);
                 rect.setAttribute('width', width);
                 rect.setAttribute('height', height);
-                rect.setAttribute('fill', `rgba(255, 107, 107, ${0.1 + intensity * 0.7})`);
+                rect.setAttribute('fill', `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${0.1 + intensity * 0.7})`);
                 rect.setAttribute('rx', '2');
                 heatmapLayer.appendChild(rect);
             });
@@ -322,6 +398,7 @@
             currentMode = mode;
             modeRealtimeBtn.classList.toggle('active', mode === 'realtime');
             modeHeatmapBtn.classList.toggle('active', mode === 'heatmap');
+            catFilterDiv.classList.toggle('visible', mode === 'heatmap');
 
             if (mode === 'realtime') {
                 clearHeatmap();
@@ -336,9 +413,26 @@
             }
         }
 
+        async function loadDevices() {
+            const res = await fetch('/api/devices');
+            devices = await res.json();
+            devices.forEach(d => {
+                const label = document.createElement('label');
+                label.innerHTML = `<input type="radio" name="cat-select" value="${d.id}"> ${d.name}`;
+                catFilterDiv.appendChild(label);
+            });
+
+            catFilterDiv.addEventListener('change', () => {
+                if (currentMode === 'heatmap') {
+                    renderHeatmap();
+                }
+            });
+        }
+
         modeRealtimeBtn.addEventListener('click', () => setMode('realtime'));
         modeHeatmapBtn.addEventListener('click', () => setMode('heatmap'));
 
+        loadDevices();
         connectWebSocket();
     </script>
 </body>
