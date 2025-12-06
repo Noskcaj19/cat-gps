@@ -213,6 +213,68 @@
             font-family: sans-serif;
             font-size: 14px;
         }
+
+        .time-adjust-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .time-adjust-row {
+            display: flex;
+            gap: 2px;
+        }
+
+        .time-adjust-btn {
+            width: 24px;
+            height: 20px;
+            padding: 0;
+            border: 1px solid var(--room-stroke);
+            border-radius: 4px;
+            background: var(--map-bg);
+            color: var(--room-label-color);
+            font-size: 10px;
+            font-family: sans-serif;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .time-adjust-btn:hover {
+            background: var(--room-stroke);
+        }
+
+        .time-adjust-labels {
+            display: flex;
+            gap: 2px;
+            font-size: 8px;
+            color: var(--room-label-color);
+            font-family: sans-serif;
+        }
+
+        .time-adjust-labels span {
+            width: 24px;
+            text-align: center;
+            font-size: 8px;
+        }
+
+        .both-adjust {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            margin-left: 8px;
+            padding-left: 8px;
+            border-left: 1px solid var(--room-stroke);
+        }
+
+        .both-adjust-label {
+            font-size: 10px;
+            color: var(--room-label-color);
+            font-family: sans-serif;
+        }
     </style>
 </head>
 <body>
@@ -232,9 +294,49 @@
             <option value="custom">Custom...</option>
         </select>
         <div id="custom-range" style="display: none; margin-left: 8px; gap: 8px; align-items: center;">
-            <input type="datetime-local" id="start-time">
+            <div class="time-adjust-group">
+                <div class="time-adjust-row">
+                    <button class="time-adjust-btn" data-target="start" data-unit="day" data-delta="1">+</button>
+                    <button class="time-adjust-btn" data-target="start" data-unit="hour" data-delta="1">+</button>
+                    <button class="time-adjust-btn" data-target="start" data-unit="minute" data-delta="1">+</button>
+                </div>
+                <input type="datetime-local" id="start-time">
+                <div class="time-adjust-row">
+                    <button class="time-adjust-btn" data-target="start" data-unit="day" data-delta="-1">−</button>
+                    <button class="time-adjust-btn" data-target="start" data-unit="hour" data-delta="-1">−</button>
+                    <button class="time-adjust-btn" data-target="start" data-unit="minute" data-delta="-1">−</button>
+                </div>
+                <div class="time-adjust-labels"><span>D</span><span>H</span><span>M</span></div>
+            </div>
             <span>to</span>
-            <input type="datetime-local" id="end-time">
+            <div class="time-adjust-group">
+                <div class="time-adjust-row">
+                    <button class="time-adjust-btn" data-target="end" data-unit="day" data-delta="1">+</button>
+                    <button class="time-adjust-btn" data-target="end" data-unit="hour" data-delta="1">+</button>
+                    <button class="time-adjust-btn" data-target="end" data-unit="minute" data-delta="1">+</button>
+                </div>
+                <input type="datetime-local" id="end-time">
+                <div class="time-adjust-row">
+                    <button class="time-adjust-btn" data-target="end" data-unit="day" data-delta="-1">−</button>
+                    <button class="time-adjust-btn" data-target="end" data-unit="hour" data-delta="-1">−</button>
+                    <button class="time-adjust-btn" data-target="end" data-unit="minute" data-delta="-1">−</button>
+                </div>
+                <div class="time-adjust-labels"><span>D</span><span>H</span><span>M</span></div>
+            </div>
+            <div class="both-adjust">
+                <span class="both-adjust-label">Both</span>
+                <div class="time-adjust-row">
+                    <button class="time-adjust-btn" data-target="both" data-unit="day" data-delta="1">+</button>
+                    <button class="time-adjust-btn" data-target="both" data-unit="hour" data-delta="1">+</button>
+                    <button class="time-adjust-btn" data-target="both" data-unit="minute" data-delta="1">+</button>
+                </div>
+                <div class="time-adjust-row">
+                    <button class="time-adjust-btn" data-target="both" data-unit="day" data-delta="-1">−</button>
+                    <button class="time-adjust-btn" data-target="both" data-unit="hour" data-delta="-1">−</button>
+                    <button class="time-adjust-btn" data-target="both" data-unit="minute" data-delta="-1">−</button>
+                </div>
+                <div class="time-adjust-labels"><span>D</span><span>H</span><span>M</span></div>
+            </div>
         </div>
     </div>
     <div class="cat-filter" id="cat-filter">
@@ -649,6 +751,34 @@
             if (currentMode === 'heatmap' && startTimeInput.value && endTimeInput.value) {
                 renderHeatmap();
             }
+        });
+
+        function adjustTime(input, unit, delta) {
+            if (!input.value) return;
+            const date = new Date(input.value);
+            if (unit === 'day') date.setDate(date.getDate() + delta);
+            else if (unit === 'hour') date.setHours(date.getHours() + delta);
+            else if (unit === 'minute') date.setMinutes(date.getMinutes() + delta);
+            const toLocalISO = (d) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+            input.value = toLocalISO(date);
+        }
+
+        document.querySelectorAll('.time-adjust-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const target = btn.dataset.target;
+                const unit = btn.dataset.unit;
+                const delta = parseInt(btn.dataset.delta, 10);
+                if (target === 'start' || target === 'both') {
+                    adjustTime(startTimeInput, unit, delta);
+                }
+                if (target === 'end' || target === 'both') {
+                    adjustTime(endTimeInput, unit, delta);
+                }
+                updateTimeRangeUrl();
+                if (currentMode === 'heatmap' && startTimeInput.value && endTimeInput.value) {
+                    renderHeatmap();
+                }
+            });
         });
 
         modeRealtimeBtn.addEventListener('click', () => setMode('realtime'));
