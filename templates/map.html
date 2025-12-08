@@ -616,6 +616,71 @@
         svg.addEventListener('mouseup', () => { isDragging = false; });
         svg.addEventListener('mouseleave', () => { isDragging = false; });
 
+        let lastTouchDist = null;
+        let lastTouchCenter = null;
+
+        svg.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                lastTouchDist = Math.hypot(dx, dy);
+                lastTouchCenter = {
+                    x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                    y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+                };
+            } else if (e.touches.length === 1) {
+                isDragging = true;
+                lastX = e.touches[0].clientX;
+                lastY = e.touches[0].clientY;
+            }
+        }, { passive: false });
+
+        svg.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const dist = Math.hypot(dx, dy);
+                const center = {
+                    x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                    y: (e.touches[0].clientY + e.touches[1].clientY) / 2
+                };
+
+                if (lastTouchDist !== null) {
+                    const rect = svg.getBoundingClientRect();
+                    const mx = (center.x - rect.left) * (svgWidth / rect.width);
+                    const my = (center.y - rect.top) * (svgHeight / rect.height);
+
+                    const oldZoom = zoom;
+                    zoom *= dist / lastTouchDist;
+                    zoom = Math.max(0.1, Math.min(10, zoom));
+
+                    panX = mx - (mx - panX) * (zoom / oldZoom);
+                    panY = my - (my - panY) * (zoom / oldZoom);
+                    updateViewport();
+                }
+
+                lastTouchDist = dist;
+                lastTouchCenter = center;
+            } else if (e.touches.length === 1 && isDragging) {
+                const rect = svg.getBoundingClientRect();
+                const scaleFactorX = svgWidth / rect.width;
+                const scaleFactorY = svgHeight / rect.height;
+                panX += (e.touches[0].clientX - lastX) * scaleFactorX;
+                panY += (e.touches[0].clientY - lastY) * scaleFactorY;
+                lastX = e.touches[0].clientX;
+                lastY = e.touches[0].clientY;
+                updateViewport();
+            }
+        }, { passive: false });
+
+        svg.addEventListener('touchend', () => {
+            isDragging = false;
+            lastTouchDist = null;
+            lastTouchCenter = null;
+        });
+
         const cats = {};
         const catColors = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3'];
         let colorIndex = 0;
