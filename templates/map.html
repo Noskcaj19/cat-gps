@@ -853,6 +853,8 @@
                 catsLayer.style.display = '';
                 if (!ws || ws.readyState === WebSocket.CLOSED) {
                     connectWebSocket();
+                } else if (ws.readyState === WebSocket.OPEN) {
+                    ws.send('get_positions');
                 }
             } else {
                 clearCats();

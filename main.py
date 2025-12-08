@@ -151,7 +151,10 @@ async def ws_positions(ws: WebSocket):
     try:
         while True:
             try:
-                await ws.receive_text()
+                msg = await ws.receive_text()
+                if msg == "get_positions":
+                    for pos in last_positions.values():
+                        await ws.send_json({k: v for k, v in pos.items() if k != "timestamp"})
             except WebSocketDisconnect:
                 break
             except Exception:
